@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Et PAM, dans la comm' !</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --jaune: #FFD600;
+  --jaune-doux: #FFF3A3;
+  --noir: #0e0e0e;
+  --encre: #1a1a1a;
+  --parchemin: #2a2419;
+  --parchemin-clair: #322c1e;
+  --blanc: #f5eedc;
+  --blanc-dim: rgba(245,238,220,0.65);
+  --orange: #E8821A;
+  --vert-pixel: #5adf5a;
+  --pixel: 2px; /* unité pixel art */
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--noir);
+  color: var(--blanc);
+  font-family: 'Crimson Pro', serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ── TEXTURE GRAIN ── */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:9997; opacity:0.6;
+}
+
+/* ── SCANLINES SUBTILES ── */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+  pointer-events:none; z-index:9996;
+}
+
+/* ══════════════════════════════════
+   HEADER FIXE
+══════════════════════════════════ */
+.site-header {
+  position:fixed; top:0; left:0; right:0;
+  height: 44px;
+  background: var(--jaune);
+  border-bottom: 3px solid var(--noir);
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 0 1.5rem;
+  z-index:200;
+}
+.header-title {
+  font-family:'Press Start 2P', monospace;
+  font-size: clamp(0.38rem, 1.4vw, 0.55rem);
+  color: var(--noir);
+  letter-spacing: 0.04em;
+}
+.header-chapter {
+  font-family:'DM Mono', monospace;
+  font-size: 0.58rem;
+  color: rgba(14,14,14,0.55);
+  font-style: italic;
+}
+
+/* ── BARRE DE PROGRESSION ── */
+.progress-track {
+  position:fixed; bottom:0; left:0; right:0;
+  height:3px; background:var(--parchemin); z-index:200;
+}
+.progress-fill {
+  height:100%; background:var(--jaune);
+  transition: width 0.7s cubic-bezier(.4,0,.2,1);
+}
+
+/* ══════════════════════════════════
+   PAGES
+══════════════════════════════════ */
+.page {
+  display:none;
+  min-height:100vh;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding: 64px 1.5rem 40px;
+  animation: pageIn 0.55s ease both;
+}
+.page.active { display:flex; }
+
+@keyframes pageIn {
+  from { opacity:0; transform:translateY(18px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.container { max-width:680px; width:100%; }
+
+/* ══════════════════════════════════
+   CARTE / ENCART PRINCIPAL
+══════════════════════════════════ */
+.card {
+  background: var(--parchemin);
+  border: 2px solid rgba(255,214,0,0.35);
+  padding: 2.8rem 3rem;
+  position:relative;
+  box-shadow:
+    0 0 0 1px rgba(255,214,0,0.08),
+    6px 6px 0 rgba(255,214,0,0.08),
+    0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* Coin pixel art décoratif */
+.card::before {
+  content:'';
+  position:absolute; top:-4px; left:-4px;
+  width:10px; height:10px;
+  background:var(--jaune);
+  box-shadow: calc(100% + 640px - 16px) 0 0 var(--jaune),
+              0 calc(100% + 4px - 1px) 0 var(--jaune),
+              calc(100% + 640px - 16px) calc(100% + 4px - 1px) 0 var(--jaune);
+  /* On le garde simple */
+}
+.card::after {
+  content:'';
+  position:absolute; inset:8px;
+  border:1px solid rgba(255,214,0,0.07);
+  pointer-events:none;
+}
+
+/* ══════════════════════════════════
+   TYPO & TEXTE
+══════════════════════════════════ */
+.label {
+  font-family:'Press Start 2P', monospace;
+  font-size: 0.42rem;
+  color: var(--jaune);
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.titre-page {
+  font-family:'Press Start 2P', monospace;
+  font-size: clamp(0.75rem, 3vw, 1.3rem);
+  color: var(--jaune);
+  line-height: 1.8;
+  margin-bottom: 1.4rem;
+  text-shadow: 3px 3px 0 rgba(255,214,0,0.12);
+}
+
+.sous-titre {
+  font-family:'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--blanc-dim);
+  letter-spacing: 0.06em;
+  margin-bottom: 2rem;
+  display:block;
+}
+
+.narration {
+  font-family:'Crimson Pro', serif;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 2;
+  color: var(--blanc);
+  font-weight: 300;
+}
+.narration em {
+  color: var(--blanc-dim);
+  font-style:italic;
+}
+.narration strong {
+  color: var(--jaune-doux);
+  font-weight: 600;
+}
+.narration blockquote {
+  border-left: 2px solid var(--jaune);
+  padding: 0.6rem 1.2rem;
+  margin: 1.2rem 0;
+  font-style:italic;
+  color: var(--jaune-doux);
+  background: rgba(255,214,0,0.04);
+}
+
+.spacer { margin: 1.2rem 0; }
+.spacer-lg { margin: 2rem 0; }
+
+/* ══════════════════════════════════
+   PIXEL ART ICONS (SVG inline)
+══════════════════════════════════ */
+.px-icon {
+  display:inline-block;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  width: 16px; height: 16px;
+}
+
+/* ── PLUMES SVG pixel art ── */
+.pixel-deco {
+  display:flex; justify-content:center; gap:0.8rem;
+  margin: 1.5rem 0;
+}
+
+/* ══════════════════════════════════
+   FICHE PERSONNAGE
+══════════════════════════════════ */
+.perso-header {
+  display:flex; align-items:center; gap:1.5rem; margin-bottom:1.5rem;
+}
+.perso-avatar {
+  position:relative;
+  width:80px; min-width:80px; height:80px;
+  border:2px solid var(--jaune);
+  background: var(--parchemin-clair);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 4px 4px 0 rgba(255,214,0,0.2);
+  overflow:hidden;
+}
+.perso-avatar img { width:100%; height:100%; object-fit:cover; }
+.perso-avatar .avatar-placeholder {
+  font-size:2rem;
+  image-rendering:pixelated;
+}
+.perso-meta { flex:1; }
+.perso-name {
+  font-family:'Press Start 2P', monospace;
+  font-size: clamp(0.5rem, 1.8vw, 0.7rem);
+  color: var(--jaune);
+  line-height:1.8;
+  margin-bottom:0.3rem;
+}
+.perso-class {
+  font-family:'DM Mono', monospace;
+  font-size:0.6rem;
+  color: var(--orange);
+  font-style:italic;
+  margin-bottom:0.2rem;
+}
+.perso-level {
+  font-family:'DM Mono', monospace;
+  font-size:0.55rem;
+  color: var(--blanc-dim);
+}
+
+/* ── LIGNE DE SÉPARATION PIXEL ── */
+.pixel-hr {
+  border:none;
+  height:2px;
+  background: repeating-linear-gradient(90deg, var(--jaune) 0, var(--jaune) 4px, transparent 4px, transparent 8px);
+  margin: 1.5rem 0;
+  opacity:0.3;
+}
+
+/* ── COMPÉTENCES ── */
+.competences { display:flex; flex-direction:column; gap:0.85rem; margin:1.2rem 0; }
+.comp-item {
+  display:grid;
+  grid-template-columns: 24px 1fr;
+  gap: 0.7rem;
+  align-items:start;
+}
+.comp-icon {
+  font-size:1rem;
+  line-height:1.6;
+  image-rendering:pixelated;
+}
+.comp-body {}
+.comp-name {
+  font-family:'DM Mono', monospace;
+  font-size:0.62rem;
+  color:var(--jaune);
+  margin-bottom:0.15rem;
+  display:block;
+}
+.comp-desc {
+  font-family:'Crimson Pro', serif;
+  font-size:0.92rem;
+  color: var(--blanc-dim);
+  line-height:1.7;
+}
+.comp-legendaire .comp-name::after {
+  content: ' ★';
+  color:var(--orange);
+}
+
+/* ── BADGE PASSIF ── */
+.passif {
+  background: rgba(255,214,0,0.06);
+  border:1px dashed rgba(255,214,0,0.25);
+  padding:0.7rem 1rem;
+  font-family:'DM Mono', monospace;
+  font-size:0.58rem;
+  color:var(--jaune-doux);
+  font-style:italic;
+  line-height:1.7;
+  margin:0.5rem 0;
+}
+
+/* ══════════════════════════════════
+   MENU DÉROULANT
+══════════════════════════════════ */
+.dropdown-wrap { margin:1.5rem 0 1rem; position:relative; }
+.dropdown-label {
+  font-family:'DM Mono', monospace;
+  font-size:0.58rem;
+  color:var(--blanc-dim);
+  margin-bottom:0.5rem;
+  display:block;
+}
+select {
+  width:100%;
+  background: var(--parchemin-clair);
+  color:var(--blanc);
+  border:2px solid rgba(255,214,0,0.4);
+  padding:0.75rem 1rem;
+  font-family:'Crimson Pro', serif;
+  font-size:1rem;
+  cursor:pointer;
+  appearance:none;
+  -webkit-appearance:none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0h2v2H0zM2 2h2v2H2zM4 4h2v2H4zM6 2h2v2H6zM8 0h2v2H8z' fill='%23FFD600'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position: right 1rem center;
+  padding-right:2.5rem;
+  transition:border-color 0.2s;
+}
+select:focus {
+  outline:none;
+  border-color:var(--jaune);
+}
+select option { background:var(--parchemin); }
+
+/* ══════════════════════════════════
+   ZONE DE SCÉNARIO (accordion)
+══════════════════════════════════ */
+.scenario-intro { margin:1rem 0; }
+.scenario-result {
+  display:none;
+  margin-top:0;
+  animation: pageIn 0.4s ease both;
+}
+.scenario-result.visible { display:block; }
+
+/* ── CHECKLIST ── */
+.checklist { list-style:none; margin:0.8rem 0; }
+.checklist li {
+  font-family:'Crimson Pro', serif;
+  font-size:1rem;
+  color:var(--blanc);
+  padding:0.25rem 0;
+  line-height:1.7;
+}
+.checklist li::before { content:'✓ '; color:var(--vert-pixel); font-family:'DM Mono',monospace; }
+
+/* ── STATS COLONNES ── */
+.stats-cols {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1rem;
+  margin:1rem 0;
+}
+.stats-bloc { }
+.stats-bloc-title {
+  font-family:'DM Mono', monospace;
+  font-size:0.55rem;
+  color:var(--jaune);
+  letter-spacing:0.08em;
+  margin-bottom:0.5rem;
+  display:block;
+}
+.stat-line {
+  font-family:'Crimson Pro', serif;
+  font-size:0.95rem;
+  color:var(--blanc-dim);
+  line-height:1.8;
+}
+.stat-line strong { color:var(--vert-pixel); font-weight:600; }
+
+/* ── UNLOCK BADGE ── */
+.unlock {
+  display:inline-block;
+  font-family:'Press Start 2P', monospace;
+  font-size:0.42rem;
+  background:var(--jaune);
+  color:var(--noir);
+  padding:0.5rem 0.9rem;
+  margin:0.8rem 0;
+  letter-spacing:0.04em;
+  line-height:1.6;
+  animation: pulseGlow 2.5s infinite;
+}
+@keyframes pulseGlow {
+  0%,100%{ box-shadow:0 0 0 0 rgba(255,214,0,0.5); }
+  50%    { box-shadow:0 0 0 8px rgba(255,214,0,0); }
+}
+
+/* ── CLIGNOTEMENT ANALYSE ── */
+.blink-text {
+  animation:blinkAnim 0.9s step-end infinite;
+  color:var(--vert-pixel);
+  font-family:'DM Mono',monospace;
+  font-size:0.62rem;
+}
+@keyframes blinkAnim { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── TÉMOIGNAGES ── */
+.temoignage {
+  background:var(--parchemin-clair);
+  border-left:3px solid var(--jaune);
+  padding:1rem 1.2rem;
+  margin:0.8rem 0;
+}
+.temo-source {
+  font-family:'DM Mono',monospace;
+  font-size:0.55rem;
+  color:var(--jaune);
+  margin-bottom:0.5rem;
+  display:block;
+}
+.temo-text {
+  font-family:'Crimson Pro',serif;
+  font-size:0.95rem;
+  line-height:1.8;
+  color:var(--blanc-dim);
+  font-style:italic;
+}
+
+/* ══════════════════════════════════
+   BOUTONS
+══════════════════════════════════ */
+.btn {
+  font-family:'Press Start 2P', monospace;
+  font-size: clamp(0.38rem, 1.3vw, 0.55rem);
+  background:var(--jaune);
+  color:var(--noir);
+  border:none;
+  padding:0.9rem 1.8rem;
+  cursor:pointer;
+  letter-spacing:0.04em;
+  line-height:1.6;
+  transition:transform 0.1s, box-shadow 0.1s;
+  box-shadow:3px 3px 0 rgba(255,255,255,0.2);
+  display:inline-block;
+  text-decoration:none;
+}
+.btn:hover { transform:translate(-2px,-2px); box-shadow:5px 5px 0 rgba(255,255,255,0.2); }
+.btn:active { transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(255,255,255,0.2); }
+
+.btn-ghost {
+  font-family:'DM Mono',monospace;
+  font-size:0.6rem;
+  background:transparent;
+  color:var(--blanc-dim);
+  border:1px solid rgba(245,238,220,0.2);
+  padding:0.6rem 1.1rem;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:inline-block;
+  text-decoration:none;
+}
+.btn-ghost:hover { color:var(--blanc); border-color:rgba(245,238,220,0.5); }
+
+.btn-wrap { text-align:center; margin-top:2rem; }
+.btn-wrap .btn + .btn-ghost { margin-top:0.8rem; display:block; }
+
+/* ── BOUTONS CONTACT PAGE FINALE ── */
+.contact-actions {
+  display:flex; flex-direction:column; gap:0.8rem; margin:1.5rem 0;
+}
+.contact-btn {
+  font-family:'Crimson Pro',serif;
+  font-size:1.05rem;
+  background:transparent;
+  color:var(--blanc);
+  border:1px solid rgba(255,214,0,0.25);
+  padding:0.9rem 1.4rem;
+  cursor:pointer;
+  text-align:left;
+  transition:all 0.2s;
+  display:flex; align-items:center; gap:0.8rem;
+  text-decoration:none;
+}
+.contact-btn:hover {
+  background:rgba(255,214,0,0.06);
+  border-color:var(--jaune);
+  color:var(--jaune-doux);
+}
+.contact-reveal {
+  display:none;
+  font-family:'DM Mono',monospace;
+  font-size:0.65rem;
+  color:var(--jaune);
+  padding:0.4rem 1rem 0.8rem 2.8rem;
+  animation:pageIn 0.3s ease both;
+}
+.contact-reveal.visible { display:block; }
+
+/* ══════════════════════════════════
+   SCROLL ZONE
+══════════════════════════════════ */
+.scroll-zone {
+  max-height:58vh;
+  overflow-y:auto;
+  padding-right:0.6rem;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,214,0,0.3) transparent;
+}
+.scroll-zone::-webkit-scrollbar { width:3px; }
+.scroll-zone::-webkit-scrollbar-thumb { background:rgba(255,214,0,0.3); }
+
+/* ══════════════════════════════════
+   PAGE 1 : OUVERTURE SPÉCIALE
+══════════════════════════════════ */
+.opening-screen {
+  text-align:center;
+  padding:2rem;
+}
+.opening-title {
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(1.1rem,5vw,2.2rem);
+  color:var(--jaune);
+  line-height:1.7;
+  margin-bottom:0.5rem;
+  text-shadow:4px 4px 0 rgba(255,214,0,0.15), 0 0 40px rgba(255,214,0,0.08);
+  animation:titleGlow 3s ease-in-out infinite alternate;
+}
+@keyframes titleGlow {
+  from { text-shadow:4px 4px 0 rgba(255,214,0,0.15); }
+  to   { text-shadow:4px 4px 0 rgba(255,214,0,0.15), 0 0 30px rgba(255,214,0,0.15); }
+}
+.opening-sub {
+  font-family:'DM Mono',monospace;
+  font-size:clamp(0.55rem,1.5vw,0.72rem);
+  color:var(--blanc-dim);
+  letter-spacing:0.08em;
+  margin-bottom:2.5rem;
+  display:block;
+}
+.ambient-text {
+  font-family:'Crimson Pro',serif;
+  font-style:italic;
+  font-size:clamp(0.88rem,1.8vw,1rem);
+  color:rgba(245,238,220,0.38);
+  line-height:2.1;
+  max-width:480px;
+  margin:0 auto 2rem;
+}
+
+/* ══════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════ */
+@media(max-width:600px){
+  .card { padding:1.8rem 1.4rem; }
+  .stats-cols { grid-template-columns:1fr; }
+  .perso-header { flex-direction:column; align-items:flex-start; }
+  .opening-title { font-size:clamp(0.8rem,7vw,1.4rem); }
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="site-header">
+  <span class="header-title">ET PAM, DANS LA COMM' !</span>
+  <span class="header-chapter" id="headerChapter">Prologue</span>
+</header>
+
+<div class="progress-track"><div class="progress-fill" id="progressFill" style="width:8%"></div></div>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 1 — OUVERTURE
+══════════════════════════════════════════════════════ -->
+<section class="page active" id="p1">
+  <div class="container">
+    <div class="card">
+      <div class="opening-screen">
+        <div class="opening-title">ET PAM,<br>DANS LA COMM' !</div>
+        <span class="opening-sub">Une aventure interactive dont vous êtes les héros</span>
+
+        <div class="ambient-text">
+          Une vieille imprimerie. Des affiches qui sèchent.<br>
+          Des discussions autour du comptoir.<br>
+          Des plantes qui gagnent discrètement du terrain.<br>
+          Un concert qui se prépare quelque part.<br>
+          Un·e bénévole qui cherche un câble.<br>
+          Trois personnes qui refont le monde autour d'un café.
+        </div>
+
+        <div class="btn-wrap" style="margin-top:0;">
+          <button class="btn" onclick="goTo('p2')">[ DÉBUTER L'AVENTURE ]</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 2 — LE ROYAUME
+══════════════════════════════════════════════════════ -->
+<section class="page" id="p2">
+  <div class="container">
+    <div class="card">
+      <div class="label">Chapitre I</div>
+      <div class="titre-page">Le Royaume<br>de La PAM</div>
+
+      <div class="scroll-zone">
+        <div class="narration">
+          <blockquote>Dans les terres de Brest se dresse un lieu singulier.</blockquote>
+
+          Jadis consacré à l'impression des mots, il est devenu un refuge pour les idées.
+          <div class="spacer"></div>
+          On y croise des artistes, des entrepreneur·ses, des associations, des voisin·es, des bénévoles, des rêveur·ses — et quelques spécialistes autoproclamé·es du bricolage de dernière minute.
+          <div class="spacer"></div>
+          Les murs vibrent de concerts. Les tables accueillent débats et ateliers. Le jardin pousse à son rythme. Le bar rassemble. Les projets naissent. Et chaque jour, une nouvelle histoire commence.
+        </div>
+
+        <!-- Pixel art : trois plumes -->
+        <div class="pixel-deco">
+          <svg width="16" height="20" viewBox="0 0 8 10" style="image-rendering:pixelated" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="0" width="2" height="1" fill="#FFD600"/>
+            <rect x="2" y="1" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="2" width="5" height="1" fill="#FFD600"/>
+            <rect x="2" y="3" width="3" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="4" width="2" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="5" width="1" height="4" fill="#FFD600"/>
+            <rect x="2" y="8" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="9" width="6" height="1" fill="#FFD600"/>
+          </svg>
+          <svg width="16" height="20" viewBox="0 0 8 10" style="image-rendering:pixelated" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="0" width="2" height="1" fill="#FFD600"/>
+            <rect x="2" y="1" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="2" width="5" height="1" fill="#FFD600"/>
+            <rect x="2" y="3" width="3" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="4" width="2" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="5" width="1" height="4" fill="#FFD600"/>
+            <rect x="2" y="8" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="9" width="6" height="1" fill="#FFD600"/>
+          </svg>
+          <svg width="16" height="20" viewBox="0 0 8 10" style="image-rendering:pixelated" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="0" width="2" height="1" fill="#FFD600"/>
+            <rect x="2" y="1" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="2" width="5" height="1" fill="#FFD600"/>
+            <rect x="2" y="3" width="3" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="4" width="2" height="1" fill="#FFF3A3"/>
+            <rect x="3" y="5" width="1" height="4" fill="#FFD600"/>
+            <rect x="2" y="8" width="4" height="1" fill="#FFD600"/>
+            <rect x="1" y="9" width="6" height="1" fill="#FFD600"/>
+          </svg>
+        </div>
+
+        <div class="narration">
+          Durant de nombreuses saisons, Alice Gelebart veilla sur les récits du royaume. Plus récemment, Mélanie Salaun rejoignit l'aventure pour apporter sa pierre à l'édifice. Grâce à elles, les histoires de La PAM trouvèrent leur chemin jusqu'aux habitant·es de la cité.
+          <div class="spacer"></div>
+          Mais une nouvelle quête approche. <strong>Une quête importante.</strong>
+        </div>
+      </div>
+
+      <div class="btn-wrap">
+        <button class="btn" onclick="goTo('p3')">[ LE CONSEIL DE LA PAM LANCE UN APPEL ! ]</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 3 — L'APPEL
+══════════════════════════════════════════════════════ -->
+<section class="page" id="p3">
+  <div class="container">
+    <div class="card">
+      <div class="label">Chapitre II</div>
+      <div class="titre-page" style="font-size:clamp(0.6rem,2.2vw,0.95rem);">Le Conseil de La PAM<br>lance alors un appel</div>
+
+      <div class="narration">
+        Il lui faut une nouvelle Gardienne de la Communication.
+        <div class="spacer"></div>
+        Une personne capable d'écouter.<br>
+        De raconter.<br>
+        De relier.<br>
+        De faire rayonner les mille et une aventures qui peuplent ce lieu hors du commun.
+      </div>
+
+      <div class="btn-wrap">
+        <button class="btn" onclick="goTo('p4')">[ ✨ UNE CANDIDATE APPARAÎT ! ✨ ]</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 4 — FICHE PERSONNAGE
+══════════════════════════════════════════════════════ -->
+<section class="page" id="p4">
+  <div class="container">
+    <div class="card">
+      <div class="label">Chapitre III — Fiche personnage</div>
+
+      <div class="scroll-zone">
+        <div class="perso-header">
+          <div class="perso-avatar">
+            <span class="avatar-placeholder">🧙‍♀️</span>
+          </div>
+          <div class="perso-meta">
+            <div class="perso-name">MATHILDE LEGRAND</div>
+            <div class="perso-class">Maîtresse des récits collectifs</div>
+            <div class="perso-level">Niveau 13 &nbsp;·&nbsp; Alignement : Communicante bienveillante</div>
+          </div>
+        </div>
+
+        <div class="passif" style="margin-bottom:1rem;">
+          <strong>Origine :</strong> Culture · Associatif · Entrepreneuriat · Institutionnel
+        </div>
+
+        <hr class="pixel-hr">
+
+        <div class="label" style="margin-bottom:0.8rem;">Caractéristiques &amp; compétences acquises</div>
+
+        <div class="competences">
+          <div class="comp-item">
+            <span class="comp-icon">🧭</span>
+            <div class="comp-body">
+              <span class="comp-name">Vision stratégique</span>
+              <span class="comp-desc">Capacité à comprendre rapidement un système complexe et à définir une direction claire.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">🔗</span>
+            <div class="comp-body">
+              <span class="comp-name">Création de lien</span>
+              <span class="comp-desc">Compétence rare permettant de connecter des personnes, des projets et des idées qui ne se seraient peut-être jamais rencontrés.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">📚</span>
+            <div class="comp-body">
+              <span class="comp-name">Transmission</span>
+              <span class="comp-desc">Bonus permanent lorsqu'il s'agit d'accompagner des équipes et de partager les connaissances.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">💡</span>
+            <div class="comp-body">
+              <span class="comp-name">Créativité</span>
+              <span class="comp-desc">Produit des idées originales tout en gardant les pieds sur terre.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">🗂️</span>
+            <div class="comp-body">
+              <span class="comp-name">Structuration</span>
+              <span class="comp-desc">Peut transformer un dossier de trente pages en plan d'action compréhensible.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">🔍</span>
+            <div class="comp-body">
+              <span class="comp-name">Curiosité</span>
+              <span class="comp-desc">Explore systématiquement les coulisses avant de raconter une histoire.</span>
+            </div>
+          </div>
+          <div class="comp-item">
+            <span class="comp-icon">📊</span>
+            <div class="comp-body">
+              <span class="comp-name">Analyse</span>
+              <span class="comp-desc">Comprend ce que racontent les données derrière les chiffres.</span>
+            </div>
+          </div>
+          <div class="comp-item comp-legendaire">
+            <span class="comp-icon">🤝</span>
+            <div class="comp-body">
+              <span class="comp-name">Sens du collectif</span>
+              <span class="comp-desc">Statistique légendaire. <em>Effet passif : augmente la cohésion des groupes à proximité.</em></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-wrap">
+        <button class="btn" onclick="goTo('p5')">[ CONSULTER LE JOURNAL D'AVENTURE ]</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 5 — JOURNAL D'AVENTURE (scénarios)
+══════════════════════════════════════════════════════ -->
+<section class="page" id="p5">
+  <div class="container">
+    <div class="card">
+      <div class="label">Chapitre IV — Journal d'aventure</div>
+      <div class="titre-page" style="font-size:clamp(0.6rem,2vw,0.85rem); margin-bottom:1rem;">
+        Qui souhaitez-vous incarner ?
+      </div>
+
+      <div class="dropdown-wrap">
+        <span class="dropdown-label">Choisissez votre personnage — l'aventure s'adapte.</span>
+        <select id="scenarioSelect" onchange="showScenario(this.value)">
+          <option value="">— Choisir —</option>
+          <option value="equipe">Je suis un·e membre de l'équipe</option>
+          <option value="benevole">Je suis un·e bénévole</option>
+          <option value="plante">Je suis une plante de La PAM 🌿</option>
+          <option value="site">Je suis le site internet de La PAM</option>
+          <option value="projet">Je suis un projet porté par plusieurs habitant·es de La PAM</option>
+        </select>
+      </div>
+
+      <div id="scenarioZone" class="scroll-zone" style="max-height:52vh;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 6 — ÉPILOGUE
+══════════════════════════════════════════════════════ -->
+<section class="page" id="p6">
+  <div class="container">
+    <div class="card">
+      <div class="label">Épilogue</div>
+      <div class="titre-page" style="font-size:clamp(0.6rem,2.2vw,0.9rem);">Souhaitez-vous débloquer<br>le chapitre suivant ?</div>
+
+      <div class="narration">
+        Toutes les histoires ne méritent pas d'être racontées. Certaines méritent surtout d'être vécues.
+        <div class="spacer"></div>
+        Ce qui me donne envie de rejoindre La PAM, ce n'est pas uniquement le poste. C'est la possibilité de contribuer à une aventure collective qui ressemble profondément à ce que j'aime construire depuis treize ans : <strong>des liens, des récits, des espaces où les gens ont envie de se retrouver.</strong>
+      </div>
+
+      <hr class="pixel-hr">
+
+      <div class="contact-actions">
+        <button class="contact-btn" onclick="toggleReveal('mail-reveal', 'mlegrand.crea@gmail.com')">
+          <span>📬</span> Contacter Mathilde
+        </button>
+        <div class="contact-reveal" id="mail-reveal"></div>
+
+        <button class="contact-btn" onclick="toggleReveal('tel-reveal', '06 62 25 62 34')">
+          <span>☎️</span> Appeler Mathilde
+        </button>
+        <div class="contact-reveal" id="tel-reveal"></div>
+
+        <a class="contact-btn" href="#" onclick="alert('Ajoutez ici le lien vers votre CV PDF !')">
+          <span>📄</span> Consulter le grimoire complet <span style="font-family:\'DM Mono\',monospace;font-size:0.6rem;color:var(--blanc-dim);">&nbsp;(CV PDF)</span>
+        </a>
+      </div>
+
+      <div class="passif" style="text-align:center; margin-top:1rem;">
+        Disponible dès le 1er septembre 2026.<br>
+        La prochaine quête commence quand vous voulez.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+/* ── NAVIGATION ── */
+const chapters = {
+  p1:{ label:'Prologue',       pct: 8  },
+  p2:{ label:'Chapitre I',     pct: 28 },
+  p3:{ label:'Chapitre II',    pct: 44 },
+  p4:{ label:'Chapitre III',   pct: 60 },
+  p5:{ label:'Chapitre IV',    pct: 78 },
+  p6:{ label:'Épilogue',       pct:100 },
+};
+
+function goTo(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const c = chapters[id]||{label:'',pct:50};
+  document.getElementById('headerChapter').textContent = c.label;
+  document.getElementById('progressFill').style.width = c.pct+'%';
+  window.scrollTo(0,0);
+}
+
+/* ── CONTACT REVEAL ── */
+function toggleReveal(id, text) {
+  const el = document.getElementById(id);
+  if (el.classList.contains('visible')) {
+    el.classList.remove('visible'); el.textContent='';
+  } else {
+    el.textContent = text;
+    el.classList.add('visible');
+  }
+}
+
+/* ── SCÉNARIOS ── */
+const scenarios = {
+
+  equipe: {
+    intro: `<div class="narration">
+      À La PAM, les idées ne manquent jamais. Les projets non plus.<br><br>
+      Les événements apparaissent parfois plus vite qu'on ne peut les programmer. Et il n'est pas rare que plusieurs sujets importants avancent en même temps.<br><br>
+      Une nouvelle personne va peut-être rejoindre l'aventure.<br><br>
+      <em>Saura-t-elle garder le cap dans un environnement où beaucoup de choses se passent simultanément ?</em>
+    </div>
+    <div class="btn-wrap" style="margin-top:1.2rem;">
+      <button class="btn" onclick="revealScenario('equipe')">[ EXAMINER SON EXPÉRIENCE ]</button>
+    </div>`,
+
+    result: `<div class="narration" style="margin-bottom:1rem;">
+      <span class="unlock">✨ CHAPITRE DÉBLOQUÉ : LA GRANDE GUILDE DES BÂTISSEURS DU FINISTÈRE</span>
+    </div>
+    <div class="narration">
+      Dans l'ouest du royaume se trouve une organisation ancienne : une fédération rassemblant des centaines d'entreprises. Des artisan·es, des dirigeant·es, des partenaires, des élu·es. Des métiers différents, des enjeux différents, des attentes différentes. Mais un objectif commun.
+      <div class="spacer"></div>
+      <strong>Quête principale :</strong> créer une stratégie globale capable de relier des publics multiples autour d'une vision commune.
+    </div>
+    <ul class="checklist" style="margin:1rem 0;">
+      <li>Création et structuration du pôle communication</li>
+      <li>Définition de la stratégie annuelle</li>
+      <li>Construction de l'identité éditoriale</li>
+      <li>Pilotage d'événements institutionnels</li>
+      <li>Relations presse</li>
+      <li>Accompagnement des équipes</li>
+      <li>Coordination transversale</li>
+      <li>Développement d'outils d'analyse et de suivi</li>
+    </ul>
+    <div class="narration">
+      Au fil des mois, elle découvre que les organisations les plus différentes partagent souvent le même défi : permettre à des personnes aux réalités très variées de se comprendre et d'avancer ensemble.
+    </div>
+    <div class="passif" style="margin:1rem 0;">
+      ✨ <strong>Ce que cela pourrait apporter à La PAM</strong><br><br>
+      La PAM n'est pas une fédération. Heureusement — les concerts y sont généralement meilleurs.<br><br>
+      Mais le défi de fond est étonnamment proche : faire vivre un collectif, faire circuler l'information, donner une voix commune à une diversité d'acteur·rices, créer du lien sans uniformiser les personnes.<br><br>
+      C'est précisément le terrain sur lequel Mathilde aime évoluer.
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" onclick="goTo('p6')">[ DÉBLOQUER L'ÉPILOGUE ]</button>
+    </div>`
+  },
+
+  benevole: {
+    intro: `<div class="narration">
+      J'adore ce lieu, j'y consacre du temps, de l'énergie. Souvent plus que je ne l'avais prévu.<br><br>
+      Entre deux réunions, trois messages et quatre idées griffonnées sur un coin de table, je participe à faire vivre des projets qui me tiennent à cœur.<br><br>
+      Mais parfois, j'ai l'impression que personne ne voit tout le travail qui se cache derrière.<br><br>
+      <em>Alors forcément, une question me traverse l'esprit. Cette nouvelle recrue comprendra-t-elle vraiment ce que représente l'engagement bénévole ?</em>
+    </div>
+    <div class="btn-wrap" style="margin-top:1.2rem;">
+      <button class="btn" onclick="revealScenario('benevole')">[ CONSULTER LES ARCHIVES ]</button>
+    </div>`,
+
+    result: `<div class="narration" style="margin-bottom:1rem;">
+      <span class="unlock">✨ CHAPITRE DÉBLOQUÉ : L'ORIGINE DE LA TISSEUSE DES RÉCITS</span>
+    </div>
+    <div class="narration">
+      Bien avant les tableaux de bord, les plans de communication et les KPI, Mathilde faisait déjà partie d'une aventure collective.<br><br>
+      Avec quelques complices, elle participe à la création d'une association culturelle. Ensemble, ils et elles imaginent des concerts, des expositions, des événements, des rencontres — dans plusieurs villes, avec beaucoup d'envie, beaucoup d'huile de coude, et des moyens parfois plus proches du système D que du budget confortable.<br><br>
+      Elle y apprend quelque chose d'essentiel : <strong>derrière chaque événement réussi se cachent souvent des dizaines d'heures invisibles.</strong> Des bénévoles, des appels passés tard le soir, des imprévus. Mais aussi des idées folles qui finissent par fonctionner.
+    </div>
+    <ul class="checklist" style="margin:1rem 0;">
+      <li>Coordination de projets culturels</li>
+      <li>Gestion d'équipe bénévole</li>
+      <li>Organisation événementielle</li>
+      <li>Communication associative</li>
+      <li>Compréhension avancée du syndrome du <em>"je vais juste donner un coup de main"</em></li>
+    </ul>
+    <div class="passif" style="margin:1rem 0;">
+      ✨ <strong>Ce que cela pourrait apporter à La PAM</strong><br><br>
+      Certaines personnes communiquent sur les projets. D'autres comprennent ce que cela représente de les faire exister.<br><br>
+      Mathilde fait partie de la deuxième catégorie. Elle sait que derrière chaque atelier, chaque concert ou chaque débat se cachent surtout des humains. Et qu'ils et elles méritent tout autant d'être mis·es en lumière.
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" onclick="goTo('p6')">[ DÉBLOQUER L'ÉPILOGUE ]</button>
+    </div>`
+  },
+
+  plante: {
+    intro: `<div class="narration">
+      Depuis plusieurs saisons, vous vivez paisiblement à La PAM.<br><br>
+      Vous avez survécu à trois rempotages, deux canicules, une invasion de moucherons — et plusieurs débats passionnés sur la meilleure façon d'arroser les plantes.<br><br>
+      <em>Vous êtes donc particulièrement qualifié·e pour évaluer les nouvelles arrivées.</em>
+    </div>
+    <div class="btn-wrap" style="margin-top:1.2rem;">
+      <button class="btn" onclick="revealScenario('plante')">[ EXAMINER LA CANDIDATE ]</button>
+    </div>`,
+
+    result: `<div class="narration" style="margin-bottom:1rem;">
+      <span class="blink-text">Analyse en cours…</span>
+    </div>
+    <div class="passif" style="margin:1rem 0; line-height:2;">
+      🌱 Compatibilité avec l'écosystème : <strong style="color:var(--vert-pixel);">97 %</strong><br>
+      🌱 Risque de monoculture managériale : <strong style="color:var(--vert-pixel);">0 %</strong><br>
+      🌱 Potentiel de coopération : <strong style="color:var(--vert-pixel);">élevé</strong><br>
+      🌱 Besoin en thé : <strong style="color:var(--orange);">à surveiller</strong>
+    </div>
+    <div class="label" style="margin-bottom:0.8rem;">Témoignages collectés auprès d'ancien·nes compagnon·nes d'aventure</div>
+    <div class="temoignage">
+      <span class="temo-source">Archive n°1 — Marie P.</span>
+      <p class="temo-text">« C'est un réel plaisir que celui de pouvoir travailler avec Mathilde. Elle apporte beaucoup aux projets et aux équipes par ses compétences, son professionnalisme et ses qualités humaines. Fiable, réactive et sachant se rendre disponible, elle est performante dans ses missions, qu'elle sait prioriser grâce à la finesse de son analyse et à sa recherche constante d'efficience. »</p>
+    </div>
+    <div class="temoignage">
+      <span class="temo-source">Archive n°2 — Alexane C.</span>
+      <p class="temo-text">« J'ai eu le plaisir d'occuper le poste d'assistante communication aux côtés de Mathilde. J'ai pu apprécier ses grandes qualités professionnelles : rigueur, efficacité, curiosité et excellente maîtrise de son domaine. Étant au début de ma carrière, j'ai énormément appris à ses côtés. Son accompagnement a été déterminant dans mon évolution professionnelle. Mathilde est également une excellente meneuse de projets et d'équipe, capable de fédérer et de faire avancer les missions avec méthode et intelligence. »</p>
+    </div>
+    <div class="passif" style="margin-top:1rem;">
+      <strong>Conclusion photosynthétique :</strong> cette candidate semble compatible avec un environnement vivant, collaboratif et légèrement imprévisible.<br>
+      <span class="unlock" style="margin-top:0.8rem;">🏆 SUCCÈS DÉBLOQUÉ : APPROUVÉE PAR LE CONSEIL BOTANIQUE</span>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" onclick="goTo('p6')">[ DÉBLOQUER L'ÉPILOGUE ]</button>
+    </div>`
+  },
+
+  site: {
+    intro: `<div class="narration">
+      Bonjour, je suis le site internet de La PAM.<br><br>
+      J'essaie de suivre. Vraiment.<br><br>
+      Mais entre les concerts, les ateliers, les projets, les rencontres, les initiatives citoyennes et les idées qui surgissent à la vitesse de la lumière, ma mission n'est pas toujours simple.<br><br>
+      <em>Une question me taraude : cette candidate maîtrise-t-elle vraiment les mystères du numérique ?</em>
+    </div>
+    <div class="btn-wrap" style="margin-top:1.2rem;">
+      <button class="btn" onclick="revealScenario('site')">[ CONSULTER LES ARCHIVES NUMÉRIQUES ]</button>
+    </div>`,
+
+    result: `<div class="narration" style="margin-bottom:1rem;">
+      <span class="unlock">✨ CHAPITRE DÉBLOQUÉ : LE MYSTÈRE DE LA PREMIÈRE PAGE DE RECHERCHE GOOGLE</span>
+    </div>
+    <div class="narration">
+      Certains racontent qu'il faudrait sacrifier plusieurs chèvres aux dieux du référencement. Heureusement, Mathilde a choisi une autre méthode.<br><br>
+      Pendant plusieurs années, elle développe sa propre activité — sans agence, sans budget publicitaire, sans armée de spécialistes. Avec pour seules armes : sa curiosité, sa capacité d'apprentissage et une quantité probablement excessive d'onglets ouverts.
+    </div>
+    <ul class="checklist" style="margin:1rem 0;">
+      <li>Création d'une identité de marque complète</li>
+      <li>Conception d'un site WordPress</li>
+      <li>Optimisation SEO avancée</li>
+      <li>Développement d'une stratégie éditoriale</li>
+      <li>Animation de communautés</li>
+      <li>Création d'événements et d'ateliers</li>
+      <li>Développement de partenariats</li>
+      <li>Création de ressources pédagogiques</li>
+    </ul>
+    <div class="passif">
+      🏆 Première page Google atteinte en moins d'un an.<br><br>
+      Plus important encore : cette aventure lui apprend à tout faire. Comprendre la technique, créer les contenus, lire les données. Ajuster, tester, recommencer.
+    </div>
+    <div class="passif" style="margin-top:0.8rem;">
+      ✨ <strong>Ce que cela pourrait apporter à La PAM</strong><br><br>
+      Un site internet n'est pas une brochure numérique. C'est souvent la première porte que les gens poussent avant de franchir la vraie. Et Mathilde aime particulièrement construire ce genre de passerelles.
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" onclick="goTo('p6')">[ DÉBLOQUER L'ÉPILOGUE ]</button>
+    </div>`
+  },
+
+  projet: {
+    intro: `<div class="narration">
+      Vous êtes une idée collective. Félicitations.<br><br>
+      C'est à la fois merveilleux et légèrement compliqué.<br><br>
+      Vous impliquez plusieurs personnes, plusieurs sensibilités, plusieurs façons de faire — et parfois, plusieurs objectifs.<br><br>
+      <em>Vous avez besoin d'être raconté·e sans perdre votre richesse.</em>
+    </div>
+    <div class="btn-wrap" style="margin-top:1.2rem;">
+      <button class="btn" onclick="revealScenario('projet')">[ CHERCHER UN·E ALLIÉ·E ]</button>
+    </div>`,
+
+    result: `<div class="narration" style="margin-bottom:1rem;">
+      <span class="unlock">✨ CHAPITRE DÉBLOQUÉ : LES DÉLICES DU KAE ET LE DÉFI DES TERRITOIRES DISPERSÉS</span>
+    </div>
+    <div class="narration">
+      Lorsque Mathilde arriva dans le royaume des Délices du Kae, elle découvrit un archipel. Plusieurs boutiques, plusieurs équipes, plusieurs habitudes, plusieurs façons de raconter une même histoire.<br><br>
+      Chaque lieu possédait sa personnalité, sa clientèle, son rythme, ses traditions. Et pourtant, quelque chose manquait : <strong>le fil rouge.</strong>
+      <div class="spacer"></div>
+      <em>Comment créer un récit commun sans effacer ce qui rend chaque lieu unique ? Comment faire en sorte que les équipes se sentent appartenir à une même aventure ?</em>
+      <div class="spacer"></div>
+      Mathilde commença par explorer le terrain. Elle observa, écouta, interrogea les équipes, analysa les forces en présence. Une fois la cartographie établie, elle entreprit de bâtir les fondations d'un récit commun.<br><br>
+      Progressivement, les boutiques cessèrent d'apparaître comme une simple addition de points de vente. Elles commencèrent à raconter une histoire commune — faite de gourmandise, de proximité et de savoir-faire. Les équipes partageaient davantage leurs initiatives. Une communauté se construisait.
+    </div>
+    <div class="stats-cols" style="margin:1.2rem 0;">
+      <div class="stats-bloc">
+        <span class="stats-bloc-title">Facebook</span>
+        <div class="stat-line"><strong>+34,5 %</strong> de couverture</div>
+        <div class="stat-line"><strong>+39 %</strong> d'interactions</div>
+        <div class="stat-line"><strong>+42 %</strong> de visites</div>
+      </div>
+      <div class="stats-bloc">
+        <span class="stats-bloc-title">Instagram</span>
+        <div class="stat-line"><strong>+62 %</strong> de couverture</div>
+        <div class="stat-line"><strong>+41 %</strong> d'interactions</div>
+        <div class="stat-line"><strong>+45 %</strong> de visites</div>
+      </div>
+    </div>
+    <div class="passif">
+      <span class="unlock" style="margin-bottom:0.8rem; display:inline-block;">🏆 COMPÉTENCE DÉBLOQUÉE : FAIRE EXISTER UN COLLECTIF SANS UNIFORMISER LES INDIVIDUS</span><br><br>
+      ✨ <strong>Ce que cette quête pourrait apporter à La PAM</strong><br><br>
+      À première vue, une épicerie gourmande et un tiers-lieu citoyen n'ont pas grand-chose en commun. Et pourtant.<br><br>
+      Dans les deux cas, il s'agit de faire exister une identité commune sans effacer les singularités, de créer des ponts entre différents espaces, de raconter une histoire suffisamment forte pour que chacun·e ait envie d'y prendre part.
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" onclick="goTo('p6')">[ DÉBLOQUER L'ÉPILOGUE ]</button>
+    </div>`
+  }
+};
+
+function showScenario(val) {
+  const zone = document.getElementById('scenarioZone');
+  if (!val || !scenarios[val]) { zone.innerHTML=''; return; }
+  zone.innerHTML = `
+    <hr class="pixel-hr">
+    <div class="scenario-intro" id="intro-${val}">${scenarios[val].intro}</div>
+    <div class="scenario-result" id="result-${val}">${scenarios[val].result}</div>
+  `;
+  zone.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function revealScenario(val) {
+  const intro  = document.getElementById('intro-'+val);
+  const result = document.getElementById('result-'+val);
+  if (intro)  intro.style.display  = 'none';
+  if (result) { result.classList.add('visible'); result.style.display='block'; }
+}
+</script>
+</body>
+</html>
